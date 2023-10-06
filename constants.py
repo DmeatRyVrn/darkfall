@@ -1,0 +1,3 @@
+TITLE = 'Игра DarkFall'
+SCREEN_WIDTH = 960
+SCREEN_HEIGHT = 640
