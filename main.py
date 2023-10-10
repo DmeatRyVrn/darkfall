@@ -25,7 +25,7 @@ class Player(arcade.Sprite):
 
         # Load textures for idle standing
         self.idle_textures = []
-        for i in range(1, 10):
+        for i in range(1, 15):
             self.idle_textures.append(
                 arcade.load_texture(f'{main_path}oblivious_idle{i}.png')
             )
@@ -41,19 +41,18 @@ class Player(arcade.Sprite):
     def update_animation(self, delta_time: float = 1/60):
         #print(self.cur_texture)
         if self.change_x == 0:
-            self.delta_time += delta_time
-            if self.delta_time > 0.06:
+            self.delta_time += delta_time/3
+            if self.delta_time >= delta_time:
                 self.delta_time = 0 
                 self.cur_texture += 1
-            if self.cur_texture > 8:
+            if self.cur_texture >= len(self.idle_textures):
                 self.cur_texture = 0
             self.texture = self.idle_textures[self.cur_texture]
             return
 
-
         
         self.delta_time += delta_time
-        if self.delta_time > 0.06:
+        if self.delta_time > delta_time:
             self.delta_time = 0 
             self.cur_texture += 1
 
@@ -68,6 +67,7 @@ class DarkFall(arcade.Window):
             constants.SCREEN_HEIGHT,
             constants.TITLE)
         
+
         self.left_pressed = False
         self.right_pressed = False
         self.up_pressed = False
