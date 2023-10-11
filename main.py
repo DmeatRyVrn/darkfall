@@ -2,7 +2,7 @@ import arcade
 import constants
 import pyglet.gl as gl
 
-PLAYER_MOVEMENT_SPEED = 3
+PLAYER_MOVEMENT_SPEED = 2
 PLAYER_JUMP_SPEED = 20
 
 
@@ -11,6 +11,9 @@ class Player(arcade.Sprite):
         super().__init__()
         self.cur_texture = 0
         self.scale = 2
+        self.is_walk = False
+        self.start_walk = False
+        self.stop_walk = False
 
         # Track our state
         self.jumping = False
@@ -34,12 +37,23 @@ class Player(arcade.Sprite):
             self.walk_textures.append(
                 arcade.load_texture(f'{main_path}oblivious_walk{i}.png')
             )
+        self.start_walk_texture = arcade.load_texture(f'{main_path}oblivious_walk.png')
         self.texture = self.idle_textures[0]
         self.hit_box = self.texture.hit_box_points
+        #self.hit_box = [(8,0), (8, 32), (21, 32), (21, 0)]
 
 
     def update_animation(self, delta_time: float = 1/60):
         #print(self.cur_texture)
+
+        if self.start_walk or self.stop_walk:
+            self.delta_time += delta_time/6
+            if self.delta_time >= delta_time:
+                self.start_walk = False
+                self.stop_walk = False
+            self.texture = self.start_walk_texture
+            return
+        
         if self.change_x == 0:
             self.delta_time += delta_time/3
             if self.delta_time >= delta_time:
@@ -49,16 +63,20 @@ class Player(arcade.Sprite):
                 self.cur_texture = 0
             self.texture = self.idle_textures[self.cur_texture]
             return
-
         
-        self.delta_time += delta_time
-        if self.delta_time > delta_time:
-            self.delta_time = 0 
-            self.cur_texture += 1
+        
+        if self.is_walk:
+                        
+            self.delta_time += delta_time/6
+            if self.delta_time >= delta_time:
+                self.delta_time = 0
+                self.cur_texture += 1
 
-        if self.cur_texture > 5:
-            self.cur_texture = 0
-        self.texture = self.walk_textures[self.cur_texture]
+            if self.cur_texture > 5:
+                self.cur_texture = 0
+            self.texture = self.walk_textures[self.cur_texture]
+            return
+
 
 class DarkFall(arcade.Window):
     def __init__(self):
@@ -156,8 +174,14 @@ class DarkFall(arcade.Window):
             self.down_pressed = True
         elif key == arcade.key.LEFT or key == arcade.key.A:
             self.left_pressed = True
+            self.player.is_walk = True
+            self.player.stop_walk = False
+            self.player.start_walk = True
         elif key == arcade.key.RIGHT or key == arcade.key.D:
             self.right_pressed = True
+            self.player.is_walk = True
+            self.player.stop_walk = False
+            self.player.start_walk = True
 
         self.process_keychange()
 
@@ -171,8 +195,14 @@ class DarkFall(arcade.Window):
             self.down_pressed = False
         elif key == arcade.key.LEFT or key == arcade.key.A:
             self.left_pressed = False
+            self.player.is_walk = False
+            self.player.stop_walk = True
+            self.player.start_walk = False
         elif key == arcade.key.RIGHT or key == arcade.key.D:
             self.right_pressed = False
+            self.player.is_walk = False
+            self.player.stop_walk = True
+            self.player.start_walk = False
 
         self.process_keychange()
 
