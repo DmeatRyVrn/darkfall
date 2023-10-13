@@ -4,7 +4,8 @@ import pyglet.gl as gl
 from enum import Enum
 
 PLAYER_MOVEMENT_SPEED = 2
-PLAYER_JUMP_SPEED = 10
+PLAYER_JUMP_SPEED = 15
+FPS = 60
 
 
 class Player(arcade.Sprite):
@@ -28,7 +29,11 @@ class Player(arcade.Sprite):
         self.frame_count = 0
         self.cur_speed = 0
         self.last_y = 0
+        self.last_x = 0 
         self.state = self.State.IDLE
+        self.last_state = self.State.IDLE
+        self.last_sprites = None
+        self.last_frame_time = 0
 
 
         # Track our state
@@ -70,11 +75,63 @@ class Player(arcade.Sprite):
         #self.hit_box = [(8,0), (8, 32), (21, 32), (21, 0)]
 
 
-    def update_animation(self, delta_time: float = 1/60):
+    def animate_sprites(self, delta_time, frame_time, sprites, is_full_cycle=False, is_update=True):
+        self.delta_time += delta_time
+        
+        if self.last_state != self.state and not self.last_sprites:
+            self.cur_texture = 0
+        
+        if is_full_cycle and not self.last_sprites:
 
-        #if self.state == self.State.IDLE:
+            self.last_sprites = sprites
+            self.last_frame_time = frame_time
+            if not is_update:
+                self.last_x = self.change_x
+                self.last_y = self.change_y
+                self.change_x = 0
+                self.change_y = 0
+
+        if self.last_sprites:
+            if self.delta_time >= self.last_frame_time:
+                self.delta_time = 0 
+                self.cur_texture += 1
+            if self.cur_texture >= len(self.last_sprites):
+                self.cur_texture = 0
+                self.last_sprites = None
+                self.change_x = self.last_x
+                self.change_y = self.last_y
+                self.last_x = 0
+                self.last_y = 0
+                #self.state = self.State.IDLE
+                print(self.last_y)
+                return
+            self.texture = self.last_sprites[self.cur_texture]
+            return
+        
+        if self.delta_time >= frame_time:
+            self.delta_time = 0 
+            self.cur_texture += 1
+        if self.cur_texture >= len(sprites):
+            self.cur_texture = 0
+
+        self.texture = sprites[self.cur_texture]
+        self.last_state = self.state
 
 
+    def update_animation(self, delta_time: float = 1/FPS):
+        #print(self.state)
+
+
+        if self.state == self.State.IDLE:
+            self.animate_sprites(delta_time, 1/30, self.idle_textures)
+        
+        if self.state == self.State.WALK:
+            self.animate_sprites(delta_time, 1/15, self.walk_textures)
+
+        if self.state == self.State.JUMP:
+            self.animate_sprites(delta_time, 1/15, self.jump_textures, True, False)
+
+        '''
         if self.is_idle_trans:
             self.delta_time += delta_time/6
             if self.delta_time >= delta_time:
@@ -153,6 +210,7 @@ class Player(arcade.Sprite):
                 return
             self.texture = self.walk_textures[self.cur_texture]
             return
+            '''
 
 
 class DarkFall(arcade.Window):
@@ -209,13 +267,15 @@ class DarkFall(arcade.Window):
 
     def on_update(self, delta_time):
         self.physics_engine.update()
-        self.scene.update_animation(1/60, ['PLAYER'])
+        self.scene.update_animation(1/FPS, ['PLAYER'])
 
     def process_keychange(self):
         """
         Called when we change a key up/down or we move on/off a ladder.
         """
         # Process up/down
+        
+
         if self.up_pressed and not self.down_pressed:
             if self.physics_engine.is_on_ladder():
                 self.player.change_y = PLAYER_MOVEMENT_SPEED
@@ -226,7 +286,9 @@ class DarkFall(arcade.Window):
                 
                 self.jump_needs_reset = True
                 self.player.is_jump = True
-
+                #self.player.state = self.player.State.JUMP
+                self.player.change_y = PLAYER_JUMP_SPEED
+                
         elif self.down_pressed and not self.up_pressed:
             if self.physics_engine.is_on_ladder():
                 self.player.change_y = -PLAYER_MOVEMENT_SPEED
@@ -234,21 +296,31 @@ class DarkFall(arcade.Window):
 
 
         # Process left/right
-        if self.right_pressed and not self.left_pressed and not self.player.is_jump:
+        if self.right_pressed and not self.left_pressed:
             self.player.cur_speed = PLAYER_MOVEMENT_SPEED
             self.player.change_x = PLAYER_MOVEMENT_SPEED
-        elif self.left_pressed and not self.right_pressed and not self.player.is_jump:
+            #self.player.state = self.player.State.WALK
+        elif self.left_pressed and not self.right_pressed:
             self.player.cur_speed = -PLAYER_MOVEMENT_SPEED
             self.player.change_x = -PLAYER_MOVEMENT_SPEED
+            #self.player.state = self.player.State.WALK
         else:
             self.player.change_x = 0
+            #self.player.state = self.player.State.IDLE
 
+        if (self.right_pressed or self.left_pressed) and not self.up_pressed:
+            self.player.state = self.player.State.WALK
+        elif self.up_pressed:
+            print('is up')
+            self.player.state = self.player.State.JUMP
+            self.up_pressed = False
+        else:
+            self.player.state = self.player.State.IDLE
 
 
     def on_key_press(self, key, modifiers):
         """Called whenever a key is pressed."""
 
-        self.player.cur_texture = 0
         if key == arcade.key.UP or key == arcade.key.W:
             self.player.is_idle_trans = True
             
@@ -258,12 +330,8 @@ class DarkFall(arcade.Window):
             self.down_pressed = True
         elif key == arcade.key.LEFT or key == arcade.key.A:
             self.left_pressed = True
-            self.player.is_walk = True
-            self.player.is_idle_trans = True
         elif key == arcade.key.RIGHT or key == arcade.key.D:
             self.right_pressed = True
-            self.player.is_walk = True
-            self.player.is_idle_trans = True
 
         self.process_keychange()
 
@@ -278,26 +346,20 @@ class DarkFall(arcade.Window):
             self.down_pressed = False
         elif key == arcade.key.LEFT or key == arcade.key.A:
             self.left_pressed = False
-            self.player.is_walk = False
-            self.player.is_idle_trans = True
+
 
         elif key == arcade.key.RIGHT or key == arcade.key.D:
             self.right_pressed = False
-            self.player.is_walk = False
-            self.player.is_idle_trans = True
-            self.player.cur_speed = 0
 
         self.process_keychange()
 
 
 def main():
     window = DarkFall()
-    window.set_update_rate(1/60)
+    window.set_update_rate(1/FPS)
     window.setup()
     window.background_color = (55, 104, 128)
     arcade.run()
-
-
 
 
 if __name__ == '__main__':
