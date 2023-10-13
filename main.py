@@ -1,12 +1,21 @@
 import arcade
 import constants
 import pyglet.gl as gl
+from enum import Enum
 
 PLAYER_MOVEMENT_SPEED = 2
 PLAYER_JUMP_SPEED = 10
 
 
 class Player(arcade.Sprite):
+    class State(Enum):
+        IDLE = 1
+        WALK = 2
+        JUMP = 3
+        FLY = 4
+        FALL = 5
+        LANDING = 6
+
     def __init__(self):
         super().__init__()
         self.cur_texture = 0
@@ -14,8 +23,12 @@ class Player(arcade.Sprite):
         self.is_walk = False
         self.is_idle_trans = False
         self.is_jump = False
+        self.is_in_jump = False
+        self.is_fall = False
         self.frame_count = 0
         self.cur_speed = 0
+        self.last_y = 0
+        self.state = self.State.IDLE
 
 
         # Track our state
@@ -41,13 +54,13 @@ class Player(arcade.Sprite):
                 arcade.load_texture(f'{main_path}oblivious_walk{i}.png')
             )
         self.jump_textures = []
-        for i in range(1, 6):
+        for i in range(1, 5):
             self.jump_textures.append(
                 arcade.load_texture(f'{main_path}oblivious_jump{i}.png')
             )
         self.fall_textures = []
-        for i in range(1, 3):
-            self.jump_textures.append(
+        for i in range(1, 4):
+            self.fall_textures.append(
                 arcade.load_texture(f'{main_path}oblivious_fall{i}.png')
             )
 
@@ -58,7 +71,9 @@ class Player(arcade.Sprite):
 
 
     def update_animation(self, delta_time: float = 1/60):
-        #print(self.cur_texture)
+
+        #if self.state == self.State.IDLE:
+
 
         if self.is_idle_trans:
             self.delta_time += delta_time/6
@@ -67,9 +82,10 @@ class Player(arcade.Sprite):
                 self.delta_time = 0
             self.texture = self.idle_trans_texture
             return
-        
-        if self.is_jump:
-            
+
+
+        if self.is_jump and not self.is_in_jump:
+
             self.delta_time += delta_time/3
             if self.delta_time >= delta_time:
 
@@ -77,27 +93,56 @@ class Player(arcade.Sprite):
                 self.cur_texture += 1
                 if self.cur_texture >= len(self.jump_textures):
                     self.is_jump = False
+                    self.is_in_jump = True
                     self.cur_texture = 0
                     self.change_y = PLAYER_JUMP_SPEED
                     self.change_x = self.cur_speed
                     self.cur_speed = 0
+                    return
             self.texture = self.jump_textures[self.cur_texture]
             return
 
+        if self.change_y > 0:
+            self.texture = self.jump_textures[3]
+            return
 
-        if self.change_x == 0:
+        if self.change_y < 0:
+            if self.is_in_jump:
+                self.delta_time += delta_time/3
+                if self.delta_time >= delta_time:
+
+                    self.delta_time = 0
+                    self.cur_texture += 1
+                    if self.cur_texture >= len(self.fall_textures):
+                        self.is_in_jump = False
+                        self.is_fall = True
+                        self.cur_texture = 0
+                        #self.change_y = PLAYER_JUMP_SPEED
+                        self.change_x = self.cur_speed
+                        self.cur_speed = 0
+                        return
+                #print(self.cur_texture)
+                self.texture = self.fall_textures[self.cur_texture]
+                return
+            self.texture = self.fall_textures[2]
+            return
+
+
+        if self.change_x == 0 and not self.is_in_jump:
+    
             self.delta_time += delta_time/3
             if self.delta_time >= delta_time:
                 self.delta_time = 0 
                 self.cur_texture += 1
             if self.cur_texture >= len(self.idle_textures):
                 self.cur_texture = 0
+                return
             self.texture = self.idle_textures[self.cur_texture]
             return
 
 
         if self.is_walk:
-                        
+
             self.delta_time += delta_time/6
             if self.delta_time >= delta_time:
                 self.delta_time = 0
@@ -105,6 +150,7 @@ class Player(arcade.Sprite):
 
             if self.cur_texture > 5:
                 self.cur_texture = 0
+                return
             self.texture = self.walk_textures[self.cur_texture]
             return
 
@@ -196,9 +242,9 @@ class DarkFall(arcade.Window):
             self.player.change_x = -PLAYER_MOVEMENT_SPEED
         else:
             self.player.change_x = 0
-            
 
-    
+
+
     def on_key_press(self, key, modifiers):
         """Called whenever a key is pressed."""
 
@@ -227,7 +273,7 @@ class DarkFall(arcade.Window):
         if key == arcade.key.UP or key == arcade.key.W:
             self.up_pressed = False
             self.jump_needs_reset = False
-            
+
         elif key == arcade.key.DOWN or key == arcade.key.S:
             self.down_pressed = False
         elif key == arcade.key.LEFT or key == arcade.key.A:
